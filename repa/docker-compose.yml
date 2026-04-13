@@ -1,0 +1,54 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: bbagrar_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: bbagrar
+      MYSQL_USER: bbagrar
+      MYSQL_PASSWORD: bbagrar_pass
+    ports:
+      - "3307:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./server/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+  api:
+    build: ./server
+    container_name: bbagrar_api
+    restart: unless-stopped
+    env_file: ./server/.env
+    environment:
+      PORT: 4000
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: bbagrar
+      DB_PASSWORD: bbagrar_pass
+      DB_NAME: bbagrar
+      JWT_SECRET: change_me_in_production
+      CORS_ORIGIN: http://localhost:5173
+    ports:
+      - "4001:4000"  # Changed from 4000 to 4001 to avoid port conflict
+    volumes:
+      - ./server/src:/app/src
+      - ./server/routes:/app/routes
+      - ./server/uploads:/app/uploads
+    depends_on:
+      - db
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: bbagrar_phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "8081:80"
+    depends_on:
+      - db
+
+volumes:
+  db_data:

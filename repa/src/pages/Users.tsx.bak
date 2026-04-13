@@ -1,0 +1,504 @@
+// pages/Users.tsx
+import { useEffect, useState } from "react";
+import { useTheme } from '../context/ThemeContext';
+import { useNotification } from '../context/NotificationContext';
+
+interface User {
+  id: number;
+  username: string;
+  email: string;
+  password?: string;
+  role: "viewer" | "admin" | "owner";
+  created_at?: string;
+}
+
+export default function Users() {
+  const { isDarkMode } = useTheme();
+  const { success, error: errorNotif } = useNotification();
+  const [users, setUsers] = useState<User[]>([]);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState({
+    username: "",
+    email: "",
+    password: "",
+    role: "viewer" as "viewer" | "admin" | "owner"
+  });
+
+  const token = localStorage.getItem("token");
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4001';
+
+  const styles = {
+    container: {
+      maxWidth: "1200px",
+      margin: "0 auto",
+      padding: "2rem",
+      fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+      backgroundColor: isDarkMode ? "#1a202c" : "#f5f7fa",
+      minHeight: "100vh",
+      color: isDarkMode ? "#e2e8f0" : "inherit"
+    },
+    title: {
+      color: isDarkMode ? "#f7fafc" : "#2c3e50",
+      fontSize: "2.5rem",
+      marginBottom: "2rem",
+      textAlign: "center" as const,
+      fontWeight: "600"
+    },
+    formContainer: {
+      backgroundColor: isDarkMode ? "#2d3748" : "white",
+      padding: "2rem",
+      borderRadius: "12px",
+      boxShadow: isDarkMode ? "0 4px 6px rgba(0, 0, 0, 0.3)" : "0 4px 6px rgba(0, 0, 0, 0.1)",
+      marginBottom: "2rem"
+    },
+    formTitle: {
+      color: isDarkMode ? "#f7fafc" : "#34495e",
+      fontSize: "1.5rem",
+      marginBottom: "1.5rem",
+      fontWeight: "500"
+    },
+    inputGroup: {
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+      gap: "1rem",
+      marginBottom: "1rem"
+    },
+    input: {
+      padding: "0.75rem",
+      border: isDarkMode ? "2px solid #4a5568" : "2px solid #e0e0e0",
+      borderRadius: "8px",
+      fontSize: "1rem",
+      transition: "border-color 0.3s ease",
+      outline: "none",
+      backgroundColor: isDarkMode ? "#4a5568" : "white",
+      color: isDarkMode ? "#f7fafc" : "inherit"
+    },
+    select: {
+      padding: "0.75rem",
+      border: isDarkMode ? "2px solid #4a5568" : "2px solid #e0e0e0",
+      borderRadius: "8px",
+      fontSize: "1rem",
+      backgroundColor: isDarkMode ? "#4a5568" : "white",
+      color: isDarkMode ? "#f7fafc" : "inherit",
+      cursor: "pointer",
+      outline: "none"
+    },
+    button: {
+      padding: "0.75rem 1.5rem",
+      backgroundColor: "#3498db",
+      color: "white",
+      border: "none",
+      borderRadius: "8px",
+      fontSize: "1rem",
+      fontWeight: "500",
+      cursor: "pointer",
+      transition: "background-color 0.3s ease",
+      marginRight: "0.5rem"
+    },
+    button2: {
+      padding: "0.75rem 1.5rem",
+      backgroundColor: "#3498db",
+      color: "white",
+      border: "none",
+      borderRadius: "8px",
+      fontSize: "1rem",
+      fontWeight: "500",
+      cursor: "pointer",
+      transition: "background-color 0.3s ease",
+      marginRight: "0.5rem",
+      marginTop: "0.5rem"
+    },
+    deleteButton: {
+      backgroundColor: "#e74c3c"
+    },
+    editButton: {
+      backgroundColor: "#f39c12"
+    },
+    table: {
+      width: "100%",
+      backgroundColor: isDarkMode ? "#2d3748" : "white",
+      borderRadius: "12px",
+      overflow: "hidden",
+      boxShadow: isDarkMode ? "0 4px 6px rgba(0, 0, 0, 0.3)" : "0 4px 6px rgba(0, 0, 0, 0.1)",
+      borderCollapse: "collapse" as const
+    },
+    tableHeader: {
+      backgroundColor: isDarkMode ? "#4a5568" : "#34495e",
+      color: "white",
+      fontWeight: "500",
+      textAlign: "left" as const,
+      padding: "1rem"
+    },
+    tableCell: {
+      padding: "1rem",
+      borderBottom: isDarkMode ? "1px solid #4a5568" : "1px solid #e0e0e0",
+      color: isDarkMode ? "#e2e8f0" : "inherit"
+    },
+    tableRow: {
+      transition: "background-color 0.3s ease"
+    },
+    editModal: {
+      backgroundColor: isDarkMode ? "#2d3748" : "white",
+      padding: "2rem",
+      borderRadius: "12px",
+      boxShadow: isDarkMode ? "0 8px 16px rgba(0, 0, 0, 0.4)" : "0 8px 16px rgba(0, 0, 0, 0.2)",
+      marginTop: "2rem",
+      border: isDarkMode ? "2px solid #4a5568" : "2px solid #3498db"
+    },
+    editTitle: {
+      color: isDarkMode ? "#f7fafc" : "#2c3e50",
+      fontSize: "1.5rem",
+      marginBottom: "1.5rem",
+      fontWeight: "500"
+    },
+    cancelButton: {
+      backgroundColor: "#95a5a6"
+    },
+    emptyState: {
+      textAlign: "center" as const,
+      padding: "3rem",
+      color: isDarkMode ? "#cbd5e0" : "#7f8c8d"
+    },
+    roleBadge: (role: string) => {
+      let backgroundColor = isDarkMode ? "#2c5282" : "#3498db";
+      if (role === "admin") {
+        backgroundColor = isDarkMode ? "#9b2c2c" : "#e74c3c";
+      } else if (role === "owner") {
+        backgroundColor = isDarkMode ? "#553c9a" : "#9b59b6";
+      }
+      return {
+        padding: "0.25rem 0.75rem",
+        borderRadius: "20px",
+        fontSize: "0.875rem",
+        fontWeight: "500",
+        backgroundColor: backgroundColor,
+        color: "white",
+        display: "inline-block"
+      };
+    }
+  };
+
+  async function loadUsers() {
+    try {
+      setLoading(true);
+      const res = await fetch(`${API_URL}/api/admin/users`, {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+
+      if (!res.ok) {
+        console.error("Backend hiba:", res.status);
+        errorNotif("Hiba", `Nem sikerült betölteni a felhasználókat (${res.status})`);
+        setUsers([]);
+        return;
+      }
+
+      const data = await res.json();
+      setUsers(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Fetch hiba:", err);
+      errorNotif("Hiba", "Nem sikerült csatlakozni a szerverhez");
+      setUsers([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (token) {
+      loadUsers();
+    }
+  }, [token]);
+
+  async function createUser(e: React.FormEvent) {
+    e.preventDefault();
+
+    if (!form.username || !form.email || !form.password) {
+      errorNotif("Hiba", "Kérlek töltsd ki az összes kötelező mezőt!");
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/api/admin/users`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify(form)
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        errorNotif("Hiba", data.error || "Nem sikerült létrehozni a felhasználót");
+        return;
+      }
+
+      success("Sikeres!", "Felhasználó létrehozva");
+      setForm({
+        username: "",
+        email: "",
+        password: "",
+        role: "viewer"
+      });
+      loadUsers();
+    } catch (err) {
+      console.error("Create user fetch hiba:", err);
+      errorNotif("Hiba", "Nem sikerült csatlakozni a szerverhez");
+    }
+  }
+
+  async function deleteUser(id: number) {
+    if (!confirm("Biztos törlöd a felhasználót?")) return;
+
+    try {
+      const res = await fetch(`${API_URL}/api/admin/users/${id}`, {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+
+      if (!res.ok) {
+        errorNotif("Hiba", "Nem sikerült törölni a felhasználót");
+        return;
+      }
+
+      success("Sikeres!", "Felhasználó törölve");
+      loadUsers();
+    } catch (err) {
+      console.error("Delete hiba:", err);
+      errorNotif("Hiba", "Nem sikerült csatlakozni a szerverhez");
+    }
+  }
+
+  async function saveUser() {
+    if (!editingUser) return;
+
+    if (!editingUser.username || !editingUser.email) {
+      errorNotif("Hiba", "Kérlek töltsd ki az összes kötelező mezőt!");
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/api/admin/users/${editingUser.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify(editingUser)
+      });
+
+      if (!res.ok) {
+        errorNotif("Hiba", "Nem sikerült frissíteni a felhasználót");
+        return;
+      }
+
+      success("Sikeres!", "Felhasználó frissítve");
+      setEditingUser(null);
+      loadUsers();
+    } catch (err) {
+      console.error("Update hiba:", err);
+      errorNotif("Hiba", "Nem sikerült csatlakozni a szerverhez");
+    }
+  }
+
+  const getRoleDisplayName = (role: string) => {
+    switch(role) {
+      case "admin": return "Admin";
+      case "owner": return "Tulajdonos";
+      default: return "Viewer";
+    }
+  };
+
+  if (!token) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.emptyState}>
+          <h2>Nincs bejelentkezve</h2>
+          <p>Kérlek jelentkezz be a felhasználók kezeléséhez</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={styles.container}>
+      <h1 style={styles.title}>👥 Felhasználók kezelése</h1>
+
+      <div style={styles.formContainer}>
+        <h2 style={styles.formTitle}>➕ Új felhasználó létrehozása</h2>
+        <form onSubmit={createUser}>
+          <div style={styles.inputGroup}>
+            <input
+              style={styles.input as any}
+              placeholder="Felhasználónév *"
+              required
+              value={form.username}
+              onChange={(e) => setForm({ ...form, username: e.target.value })}
+            />
+            <input
+              style={styles.input as any}
+              placeholder="Email *"
+              type="email"
+              required
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+            />
+            <input
+              style={styles.input as any}
+              type="password"
+              placeholder="Jelszó *"
+              required
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+            />
+            <select
+              style={styles.select as any}
+              value={form.role}
+              onChange={(e) => setForm({ ...form, role: e.target.value as "viewer" | "admin" | "owner" })}
+            >
+              <option value="viewer">Viewer</option>
+              <option value="admin">Admin</option>
+              <option value="owner">Tulajdonos</option>
+            </select>
+          </div>
+          <button
+            type="submit"
+            style={styles.button as any}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#2980b9"}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "#3498db"}
+          >
+            ✓ Felhasználó létrehozása
+          </button>
+        </form>
+      </div>
+
+      <h2 style={{...styles.formTitle, marginTop: "2rem"}}>📋 Felhasználók listája ({users.length})</h2>
+
+      {loading && (
+        <div style={styles.emptyState}>
+          <p>Betöltés...</p>
+        </div>
+      )}
+
+      {!loading && users.length === 0 ? (
+        <div style={styles.emptyState}>
+          <p>Nincsenek felhasználók az adatbázisban</p>
+        </div>
+      ) : (
+        <div style={{overflowX: "auto"}}>
+          <table style={styles.table as any}>
+            <thead>
+              <tr>
+                <th style={styles.tableHeader}>ID</th>
+                <th style={styles.tableHeader}>Felhasználónév</th>
+                <th style={styles.tableHeader}>Email</th>
+                <th style={styles.tableHeader}>Szerepkör</th>
+                <th style={styles.tableHeader}>Létrehozva</th>
+                <th style={styles.tableHeader}>Műveletek</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((u) => (
+                <tr
+                  key={u.id}
+                  style={styles.tableRow as any}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDarkMode ? "#4a5568" : "#f8f9fa"}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                >
+                  <td style={styles.tableCell}>{u.id}</td>
+                  <td style={styles.tableCell}>{u.username}</td>
+                  <td style={styles.tableCell}>{u.email}</td>
+                  <td style={styles.tableCell}>
+                    <span style={styles.roleBadge(u.role)}>
+                      {getRoleDisplayName(u.role)}
+                    </span>
+                  </td>
+                  <td style={styles.tableCell}>
+                    {u.created_at ? new Date(u.created_at).toLocaleDateString('hu-HU') : '-'}
+                  </td>
+                  <td style={styles.tableCell}>
+                    <button
+                      style={{...styles.button, ...styles.editButton} as any}
+                      onClick={() => setEditingUser(u)}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#e67e22"}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "#f39c12"}
+                    >
+                      ✏️ Szerkesztés
+                    </button>
+                    <button
+                      style={{...styles.button, ...styles.deleteButton} as any}
+                      onClick={() => deleteUser(u.id)}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#c0392b"}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "#e74c3c"}
+                    >
+                      🗑️ Törlés
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {editingUser && (
+        <div style={styles.editModal}>
+          <h3 style={styles.editTitle}>✏️ Felhasználó szerkesztése</h3>
+          <div style={styles.inputGroup}>
+            <input
+              style={styles.input as any}
+              placeholder="Felhasználónév"
+              value={editingUser.username}
+              onChange={(e) =>
+                setEditingUser({ ...editingUser, username: e.target.value })
+              }
+            />
+            <input
+              style={styles.input as any}
+              placeholder="Email"
+              value={editingUser.email}
+              onChange={(e) =>
+                setEditingUser({ ...editingUser, email: e.target.value })
+              }
+            />
+            <select
+              style={styles.select as any}
+              value={editingUser.role}
+              onChange={(e) =>
+                setEditingUser({ ...editingUser, role: e.target.value as "viewer" | "admin" | "owner" })
+              }
+            >
+              <option value="viewer">Viewer</option>
+              <option value="admin">Admin</option>
+              <option value="owner">Tulajdonos</option>
+            </select>
+          </div>
+          <div>
+            <button
+              style={styles.button2 as any}
+              onClick={saveUser}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#2980b9"}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "#3498db"}
+            >
+              ✓ Mentés
+            </button>
+            <button
+              style={{...styles.button2, ...styles.cancelButton} as any}
+              onClick={() => setEditingUser(null)}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#7f8c8d"}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "#95a5a6"}
+            >
+              ✕ Mégse
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

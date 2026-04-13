@@ -1,0 +1,8 @@
+Indítsd el a dockert
+VS CODE TERMINAL:
+npm i
+cd server
+npm i
+cd ..
+docker compose up -d
+npm run dev
